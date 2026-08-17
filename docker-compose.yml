@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  polyagent-studio:
+    build: .
+    container_name: polyagent-studio
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    restart: unless-stopped
