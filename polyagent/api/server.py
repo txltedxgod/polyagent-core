@@ -1,17 +1,19 @@
 from __future__ import annotations
-from typing import Dict, Any
-import json
-import asyncio
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-from polyagent.graph.state import State
-from polyagent.graph.graph import WorkflowGraph, END, START
+import asyncio
+import json
+from typing import Any
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel, Field
+
 from polyagent.agents.agent import Agent, AgentRole
-from polyagent.tools.sandbox import python_repl_tool, calculator_tool
+from polyagent.graph.graph import END, WorkflowGraph
+from polyagent.graph.state import State
 from polyagent.memory.vector import VectorMemory
+from polyagent.tools.sandbox import calculator_tool, python_repl_tool
 
 app = FastAPI(
     title="PolyAgent Studio",
@@ -22,7 +24,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -48,8 +50,13 @@ graph.add_edge("critic", END)
 
 
 class RunTaskRequest(BaseModel):
-    task: str
-    context: Dict[str, Any] = {}
+    task: str = Field(..., min_length=1, max_length=5000)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    return {"status": "healthy", "workflow": graph.name}
 
 
 @app.get("/api/graph")
@@ -160,18 +167,18 @@ HTML_PAGE = """<!DOCTYPE html>
             logBox.innerHTML = '<div style="color: var(--accent-light)">[INIT] Connecting to PolyAgent Event Stream...</div>';
 
             const evtSource = new EventSource('/api/stream?task=' + encodeURIComponent(task));
-            
+
             evtSource.onmessage = function(event) {
                 const state = JSON.parse(event.data);
-                logBox.innerHTML = '';
+                logBox.textContent = '';
                 state.messages.forEach(msg => {
-                    const toolHtml = msg.tool_calls ? msg.tool_calls.map(t => '<div class="tool-chip">Executed: ' + t.tool + '</div>').join('') : '';
-                    logBox.innerHTML += '<div class="msg"><div class="msg-role">' + (msg.name || msg.role).toUpperCase() + '</div><div>' + msg.content.replace(/\\n/g, '<br/>') + '</div>' + toolHtml + '</div>';
+                    const card = document.createElement('div'); card.className = 'msg'; const roleEl = document.createElement('div'); roleEl.className = 'msg-role'; roleEl.textContent = (msg.name || msg.role).toUpperCase(); const bodyEl = document.createElement('div'); bodyEl.style.whiteSpace = 'pre-wrap'; bodyEl.textContent = msg.content; card.appendChild(roleEl); card.appendChild(bodyEl); (msg.tool_calls || []).forEach(t => { const chip = document.createElement('div'); chip.className = 'tool-chip'; chip.textContent = 'Executed: ' + t.tool; card.appendChild(chip); });
+                    logBox.appendChild(card);
                 });
                 logBox.scrollTop = logBox.scrollHeight;
 
                 if (state.completed) {
-                    logBox.innerHTML += '<div style="color: var(--success); font-weight:bold; margin-top:12px;">✔ DAG Workflow Completed Successfully!</div>';
+                    const doneEl = document.createElement('div'); doneEl.style.cssText = 'color: var(--success); font-weight:bold; margin-top:12px;'; doneEl.textContent = 'DAG Workflow Completed Successfully!'; logBox.appendChild(doneEl);
                     evtSource.close();
                 }
             };

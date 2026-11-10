@@ -1,13 +1,13 @@
 from __future__ import annotations
-from typing import List, Dict, Any, Optional
-from enum import Enum
-import asyncio
+
+from enum import StrEnum
+
 from polyagent.graph.state import State
-from polyagent.tools.base import Tool
 from polyagent.memory.vector import VectorMemory
+from polyagent.tools.base import Tool
 
 
-class AgentRole(str, Enum):
+class AgentRole(StrEnum):
     PLANNER = "planner"
     RESEARCHER = "researcher"
     CODER = "coder"
@@ -25,8 +25,8 @@ class Agent:
         name: str,
         role: AgentRole = AgentRole.GENERAL,
         system_prompt: str = "",
-        tools: Optional[List[Tool]] = None,
-        memory: Optional[VectorMemory] = None,
+        tools: list[Tool] | None = None,
+        memory: VectorMemory | None = None,
     ):
         self.name = name
         self.role = role
@@ -72,9 +72,9 @@ class Agent:
             state = state.set_context("code_result", tool_res)
 
         elif self.role == AgentRole.CRITIC:
-            plan = state.context.get("plan", "No plan")
-            output_content = f"Review completed. Plan quality score: 9.8/10. Ready for final release."
-            state = state.set_context("review_passed", True)
+            has_plan = bool(state.context.get("plan"))
+            output_content = "Review completed: plan verified." if has_plan else "Review incomplete: no plan provided."
+            state = state.set_context("review_passed", has_plan and state.error is None)
 
         else:
             output_content = f"Execution step finished for {self.name}."
