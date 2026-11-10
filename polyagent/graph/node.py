@@ -1,6 +1,8 @@
 from __future__ import annotations
-from typing import Callable, Awaitable, Any, Optional
+
 import inspect
+from collections.abc import Awaitable, Callable
+
 from polyagent.graph.state import State
 
 NodeFunc = Callable[[State], Awaitable[State]] | Callable[[State], State]
